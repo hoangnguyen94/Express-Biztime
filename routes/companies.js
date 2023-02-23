@@ -1,10 +1,12 @@
 /**Routes for companies */
 
 const express = require( "express" );
+const slugify = require( "slugify" );
+
 const db = require( "../db" );
 const ExpressError = require( "../expressError" );
 
-let router = express.Router();
+let router = new express.Router();
 
 /** GET / => list of companies.
  *
@@ -16,11 +18,15 @@ router.get( '/', async ( req, res, next ) =>
 {
     try
     {
-        const results = await db.query( `SELECT * FROM companies ORDER BY name`);
-        return res.json( { companies: results.rows } )
+      const results = await db.query(
+        `SELECT code, name 
+        FROM companies
+        ORDER BY name` );
+      
+      return res.json( { "companies": results.rows } )
     } catch ( err )
     {
-        return next( err );
+      return next( err );
     }
 } );
 
@@ -34,33 +40,33 @@ router.get( '/:code', async ( req, res, next ) =>
 {
     try
     {
-        let code = req.params.code;
+      let code = req.params.code;
       
-        const compResult = await db.query(
-            `SELECT code, name, description 
-            FROM companies
-            WHERE code = $1`, [ code ] );
+      const compResult = await db.query(
+          `SELECT code, name, description 
+          FROM companies
+          WHERE code = $1`, [ code ] );
         
-        const invResult = await db.query(
-            `SELECT id 
-            FROM invoices
-            WHERE comp_code = $1`, [ code ] );
+      const invResult = await db.query(
+          `SELECT id 
+          FROM invoices
+          WHERE comp_code = $1`, [ code ] );
         
-        if ( compResult.rows.length === 0 )
+      if ( compResult.rows.length === 0 )
         {
-            throw new ExpressError( `No such company: ${code}`, 404 )
+          throw new ExpressError( `No such company: ${code}`, 404 )
         };
 
-        const company = compResult.rows[ 0 ];
-        const invoices = invResult.rows;
+      const company = compResult.rows[ 0 ];
+      const invoices = invResult.rows;
       
-        company.invoices = invoices.map( inv => inv.id )
+      company.invoices = invoices.map( inv => inv.id )
       
-        return res.json( { "company": company } );
+      return res.json( { "company": company } );
     }
     catch ( err )
     {
-        return next( err );
+      return next( err );
     }
 } );
 
@@ -74,7 +80,8 @@ router.post( '/', async ( req, res, next ) =>
 {
     try
     {
-      let { code, name, description } = req.body;
+      let { name, description } = req.body;
+      let code = slugify( name, { lower: true } );
       
       const result = await db.query(
         `INSERT INTO companies (code, name, description)
@@ -82,7 +89,7 @@ router.post( '/', async ( req, res, next ) =>
         RETURNING code, name, description`,
         [ code, name, description ] );
       
-      return res.status( 201 ).json( { company: result.rows[ 0 ] } )
+      return res.status( 201 ).json( { "company": result.rows[ 0 ] } )
     } catch ( err )
     {
       return next( err );
